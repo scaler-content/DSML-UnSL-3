@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>t-SNE & UMAP post read</title>
+<style>
+:root{
+  --p-900:#2e1065;
+  --p-800:#4c1d95;
+  --p-700:#6d28d9;
+  --p-600:#7c3aed;
+  --p-500:#9333ea;
+  --p-400:#a855f7;
+  --p-300:#c084fc;
+  --p-200:#e9d5ff;
+  --p-100:#f3e8ff;
+  --white:#ffffff;
+  --ink:#1e1033;
+  --ink-soft:#4a3a66;
+  --line:#e4d4fb;
+  --bg:#ffffff;
+  --card:#ffffff;
+  --shadow: 0 10px 30px -12px rgba(109,40,217,.25);
+  --radius:16px;
+  --maxw:880px;
+  --code-bg:#2b1458;
+  --code-ink:#f3e8ff;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family: "Source Serif Pro","Iowan Old Style", Georgia, "Times New Roman", serif;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+.sans{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;}
+h1,h2,h3,h4{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  font-weight:800;
+  color:var(--ink);
+  letter-spacing:-0.01em;
+  line-height:1.2;
+}
+a{color:var(--p-600);}
+
+.topbar{
+  position:sticky; top:0; z-index:50;
+  background:rgba(255,255,255,.85);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 20px;
+}
+.topbar .brand{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  font-weight:800; font-size:14px; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--p-700);
+  display:flex; align-items:center; gap:8px;
+}
+.topbar .brand .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--p-500),var(--p-300));}
+.progress-track{
+  position:fixed; top:0; left:0; height:3px; width:0%;
+  background:linear-gradient(90deg,var(--p-700),var(--p-400));
+  z-index:60; transition:width .1s linear;
+}
+button:focus-visible, [tabindex]:focus-visible, a:focus-visible, input:focus-visible{
+  outline:3px solid var(--p-400); outline-offset:2px;
+}
+
+.hero{
+  padding:72px 20px 56px;
+  background:
+    radial-gradient(1100px 420px at 50% -10%, var(--p-200), transparent 60%),
+    linear-gradient(180deg,var(--p-100),var(--bg));
+  text-align:center;
+  border-bottom:1px solid var(--line);
+}
+.hero .eyebrow{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  font-size:13px; font-weight:800; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--p-600); margin-bottom:14px;
+}
+.hero h1{
+  font-size:clamp(2rem,5vw,3.2rem);
+  margin:0 auto 18px; max-width:780px;
+  background:linear-gradient(135deg,var(--p-800),var(--p-500));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.hero p.sub{
+  max-width:640px; margin:0 auto; color:var(--ink-soft); font-size:1.08rem;
+  font-family:inherit;
+}
+.hero .chips{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:26px;}
+.chip{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  font-size:12.5px; font-weight:700; color:var(--p-700);
+  background:var(--white); border:1px solid var(--p-200);
+  padding:6px 12px; border-radius:999px;
+}
+
+main{max-width:var(--maxw); margin:0 auto; padding:10px 20px 100px;}
+section.block{margin:64px 0;}
+section.block > h2{
+  font-size:clamp(1.5rem,3vw,1.9rem);
+  margin:0 0 6px;
+  display:flex; align-items:center; gap:12px;
+}
+section.block > h2 .num{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:34px;height:34px;border-radius:10px; flex:none;
+  background:linear-gradient(135deg,var(--p-600),var(--p-400));
+  color:#fff; font-size:15px; font-weight:800;
+}
+.kicker{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  font-size:12.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--p-500); margin:0 0 10px 46px;
+}
+h3{font-size:1.2rem; margin:28px 0 10px;}
+p{margin:0 0 14px;}
+ul,ol{padding-left:22px; margin:0 0 14px;}
+li{margin-bottom:6px;}
+strong{color:var(--p-700); font-weight:700;}
+
+.card{
+  background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+  padding:22px 24px; box-shadow:var(--shadow); margin:22px 0;
+}
+.story{
+  background:linear-gradient(160deg,var(--p-800),var(--p-600));
+  color:#fff; border-radius:20px; padding:30px 28px; box-shadow:var(--shadow);
+  position:relative; overflow:hidden;
+}
+.story::before{
+  content:""; position:absolute; inset:0;
+  background:radial-gradient(500px 220px at 90% -20%, rgba(255,255,255,.18), transparent 60%);
+}
+.story h3{color:#fff; margin-top:0;}
+.story strong{color:#fff; text-decoration:underline; text-decoration-color:var(--p-300); text-underline-offset:3px;}
+.story p{position:relative;}
+.story ul{position:relative;}
+.story ol{position:relative;}
+.callout{
+  border-left:4px solid var(--p-500);
+  background:var(--p-100); border-radius:0 12px 12px 0;
+  padding:16px 18px; margin:18px 0;
+}
+.callout .label{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  font-size:11.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--p-600); margin-bottom:6px; display:block;
+}
+.callout.ai{ border-left-color:var(--p-700); }
+.callout.rule{ border-left-color:var(--p-400); }
+.callout p:last-child{margin-bottom:0;}
+blockquote.idea{
+  margin:18px 0; padding:16px 20px; font-style:italic; color:var(--p-800);
+  border-left:4px solid var(--p-500); background:var(--p-100); border-radius:0 12px 12px 0;
+}
+
+.table-wrap{overflow-x:auto; margin:18px 0; border-radius:12px; border:1px solid var(--line);}
+table{border-collapse:collapse; width:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif; font-size:14px;}
+th,td{padding:10px 13px; text-align:left; border-bottom:1px solid var(--line);}
+th{background:var(--p-100); color:var(--p-800); font-weight:800; font-size:12.5px;}
+tr:last-child td{border-bottom:none;}
+
+figure{margin:22px 0; text-align:center;}
+figure img{max-width:100%; border-radius:14px; border:1px solid var(--line); box-shadow:var(--shadow);}
+figcaption{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  font-size:13px; color:var(--ink-soft); margin-top:10px;
+}
+
+pre{
+  background:var(--code-bg); color:var(--code-ink); border-radius:12px;
+  padding:16px 18px; overflow-x:auto; font-size:13.3px; line-height:1.55;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  margin:16px 0;
+}
+code{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;}
+.out-label{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--p-500); margin:14px 0 -6px;
+}
+details.codebox{
+  border:1px solid var(--line); border-radius:12px; margin:16px 0; background:var(--card);
+}
+details.codebox summary{
+  cursor:pointer; padding:12px 16px; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  font-weight:700; font-size:13.5px; color:var(--p-700); list-style:none; display:flex; align-items:center; gap:8px;
+}
+details.codebox summary::-webkit-details-marker{display:none;}
+details.codebox summary::before{content:"▸"; color:var(--p-500); transition:transform .15s;}
+details.codebox[open] summary::before{transform:rotate(90deg);}
+details.codebox > div{padding:0 16px 16px;}
+
+.tabs{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+.tab-btn{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  font-weight:700; font-size:13.5px; padding:9px 16px; border-radius:999px;
+  border:1px solid var(--p-300); background:var(--white); color:var(--p-700); cursor:pointer;
+}
+.tab-btn[aria-selected="true"]{background:linear-gradient(135deg,var(--p-600),var(--p-400)); color:#fff; border-color:transparent;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block; animation:fade .25s ease;}
+@keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
+.accordion-item{border:1px solid var(--line); border-radius:12px; margin-bottom:10px; overflow:hidden; background:var(--card);}
+.accordion-head{
+  width:100%; text-align:left; background:none; border:none; cursor:pointer;
+  padding:14px 18px; display:flex; justify-content:space-between; align-items:center; gap:12px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif; font-weight:700; color:var(--p-700); font-size:14.5px;
+}
+.accordion-head .chevron{transition:transform .2s; color:var(--p-500); flex:none;}
+.accordion-item.open .chevron{transform:rotate(180deg);}
+.accordion-body{max-height:0; overflow:hidden; transition:max-height .25s ease;}
+.accordion-body > div{padding:0 18px 16px; font-size:14.5px; color:var(--ink-soft);}
+.accordion-body strong{color:var(--p-700);}
+
+.widget{
+  border:1px solid var(--line); border-radius:var(--radius); background:var(--card);
+  padding:20px; margin:20px 0; box-shadow:var(--shadow);
+}
+.widget h4{
+  margin:0 0 4px; font-size:15px; color:var(--p-700); display:flex; align-items:center; gap:8px;
+}
+.widget h4 .tag{
+  font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+  background:var(--p-100); color:var(--p-600); padding:2px 8px; border-radius:999px;
+}
+.widget .hint{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif; font-size:13px; color:var(--ink-soft); margin-bottom:14px;}
+.widget-grid{display:grid; grid-template-columns:1.1fr .9fr; gap:18px; align-items:start;}
+@media(max-width:640px){.widget-grid{grid-template-columns:1fr;}}
+.control-row{display:flex; align-items:center; gap:12px; margin:10px 0; flex-wrap:wrap; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif; font-size:13.5px;}
+input[type=range]{
+  flex:1; min-width:120px; accent-color:var(--p-600); height:6px; cursor:pointer;
+}
+.readout{
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background:var(--p-100); color:var(--p-700); border-radius:8px; padding:4px 10px; font-size:13px; font-weight:700;
+  min-width:70px; text-align:center;
+}
+.btn-row{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
+.btn{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif; font-weight:700; font-size:13px;
+  background:var(--white); border:1px solid var(--p-300); color:var(--p-700);
+  padding:8px 14px; border-radius:10px; cursor:pointer;
+}
+.btn.active, .btn:hover{background:linear-gradient(135deg,var(--p-600),var(--p-400)); color:#fff; border-color:transparent;}
+svg.viz{width:100%; height:auto; display:block; background:var(--p-100); border-radius:12px;}
+.stat-mini{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;}
+.stat-pill{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif; font-size:12.5px;
+  background:var(--p-100); color:var(--p-700); padding:6px 12px; border-radius:10px; font-weight:700;
+}
+.bar-compare{display:flex; flex-direction:column; gap:10px; margin-top:6px;}
+.bar-row{display:flex; align-items:center; gap:10px; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif; font-size:13px;}
+.bar-row .bar-label{width:110px; flex:none; color:var(--ink-soft); font-weight:700;}
+.bar-track{flex:1; height:26px; background:var(--p-100); border-radius:6px; overflow:hidden; position:relative;}
+.bar-fill{height:100%; background:linear-gradient(90deg,var(--p-700),var(--p-400)); border-radius:6px; transition:width .3s ease; display:flex; align-items:center; justify-content:flex-end; padding-right:8px;}
+.bar-fill span{color:#fff; font-size:11.5px; font-weight:800;}
+.big-stat{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  text-align:center; padding:18px; background:var(--p-100); border-radius:14px;
+}
+.big-stat .num{font-size:2.4rem; font-weight:800; color:var(--p-700); line-height:1;}
+.big-stat .lbl{font-size:12.5px; color:var(--ink-soft); margin-top:6px;}
+
+.quiz{background:linear-gradient(160deg,var(--p-700),var(--p-500)); color:#fff; border-radius:18px; padding:24px 26px; margin:26px 0; box-shadow:var(--shadow);}
+.quiz .qlabel{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif; font-size:11.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; opacity:.85; margin-bottom:8px;}
+.quiz h4{color:#fff; font-size:1.05rem; margin:0 0 16px;}
+.quiz .opt{
+  display:block; width:100%; text-align:left; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.35); color:#fff;
+  padding:12px 16px; border-radius:10px; margin-bottom:9px; cursor:pointer; font-size:14px;
+}
+.quiz .opt:hover{background:rgba(255,255,255,.2);}
+.quiz .opt.correct{background:#22c55e; border-color:#22c55e;}
+.quiz .opt.wrong{background:#ef4444; border-color:#ef4444;}
+.quiz .feedback{
+  margin-top:14px; background:rgba(255,255,255,.12); border-radius:10px; padding:14px 16px;
+  font-size:14px; display:none;
+}
+.quiz .feedback.show{display:block; animation:fade .3s ease;}
+
+.grid-cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin:20px 0;}
+.mini-card{
+  background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+}
+.mini-card .mc-title{font-weight:800; color:var(--p-700); font-size:14px; margin-bottom:6px;}
+.mini-card p{font-size:13.3px; color:var(--ink-soft); margin:0;}
+
+.takeaways{
+  background:var(--p-100); border:1px solid var(--p-200); border-radius:16px; padding:24px 26px; margin:26px 0;
+}
+.takeaways h3{margin-top:0;}
+.takeaways ul{margin-bottom:0;}
+
+footer{
+  text-align:center; padding:40px 20px 60px; color:var(--ink-soft);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif; font-size:13px;
+  border-top:1px solid var(--line); margin-top:40px;
+}
+footer .fname{color:var(--p-600); font-weight:800;}
+
+@media(max-width:480px){
+  .hero{padding:56px 16px 44px;}
+  section.block{margin:48px 0;}
+  .kicker{margin-left:0;}
+  section.block > h2{flex-wrap:wrap;}
+  .bar-row .bar-label{width:86px;}
+}
+</style>
+</head>
+<body>
+
+<div class="progress-track" id="progressTrack"></div>
+<div class="topbar">
+  <div class="brand"><span class="dot"></span>t-SNE &amp; UMAP post read</div>
+</div>
+
+<header class="hero">
+  <div class="eyebrow">Unsupervised Learning · Interactive Read</div>
+  <h1>t-SNE &amp; UMAP: Exploring Data in Lower Dimensions</h1>
+  <p class="sub">t-SNE gave SwiftParcel beautiful maps — but it's slow and can't place new points. Here's how UMAP builds a faster, reusable map from a neighbourhood graph, what its two dials actually control, and the specific ways both methods can quietly mislead you.</p>
+  <div class="chips">
+    <span class="chip">Fuzzy neighbourhood graphs</span>
+    <span class="chip">n_neighbors & min_dist</span>
+    <span class="chip">transform for new data</span>
+    <span class="chip">Reading maps honestly</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============ OPENING STORY ============ -->
+<section class="block">
+  <div class="story">
+    <h3>The Dashboard That Takes All Night</h3>
+    <p>In Class 2, Meera at <strong>SwiftParcel</strong> gave the operations team a t-SNE map of handwritten digit scans, and they loved it. Now the returns department wants the same thing for something bigger: <strong>photos of returned items</strong> (clothes, shoes, bags) from all 40 hubs.</p>
+    <p>They want three things:</p>
+    <ol>
+      <li>A map where similar items sit together, to see which categories get mixed up in returns (shirts vs. T-shirts, sandals vs. sneakers).</li>
+      <li>A map that <strong>refreshes every day</strong>, on millions of photos. Meera's first t-SNE run on a small sample already takes minutes.</li>
+      <li>The ability to <strong>drop in today's new photos</strong> onto the existing map, without redrawing everything and shuffling every island.</li>
+    </ol>
+    <p style="margin-bottom:0;">Meera remembers her own warnings from last class: t-SNE is slow, it has no <code style="color:#fff;">transform</code> for new data, and gaps between islands mean nothing. She needs a newer tool. Today: <strong>UMAP</strong> — much faster, can place new points on an existing map, and often keeps the overall layout more sensible. We'll also learn to be sceptical of it. It has its own ways of misleading you.</p>
+  </div>
+</section>
+
+<!-- ============ 1. T-SNE IN ONE PAGE ============ -->
+<section class="block" id="sec1">
+  <div class="kicker">Section 1</div>
+  <h2><span class="num">1</span>t-SNE in One Page</h2>
+  <p>From Class 2, t-SNE works in three steps:</p>
+  <ol>
+    <li><strong>High-D similarities:</strong> for each point i, a Gaussian (width set by perplexity) gives the probability p<sub>ij</sub> that j is a neighbour.</li>
+    <li><strong>Low-D similarities:</strong> a heavy-tailed <strong>Student t-distribution</strong> (1 degree of freedom) gives q<sub>ij</sub> in the map — the heavy tails relieve the crowding problem.</li>
+    <li><strong>Match them:</strong> minimise the KL divergence between P and Q.</li>
+  </ol>
+
+  <h3>What are the "learning parameters" of t-SNE?</h3>
+  <p>Not weights of a model. The parameters being optimised are the <strong>2D coordinates y<sub>i</sub> of every point</strong>. Gradient descent literally slides each point around the map. This is why t-SNE has no model to reuse on new data: there is just a set of positions, and no function from input to output.</p>
+
+  <h3>Why does KL divergence punish some errors more than others?</h3>
+  <p>KL is <strong>asymmetric</strong>. If two points are neighbours in high-D (p<sub>ij</sub> large) but far apart in the map (q<sub>ij</sub> small), the term p·log(p/q) becomes large — <strong>tearing neighbours apart is expensive</strong>. If two points are far apart in high-D (p<sub>ij</sub> near zero) but close in the map, the penalty is small — <strong>putting strangers together is cheap</strong>.</p>
+  <p>So t-SNE protects local neighbourhoods and is relaxed about what happens between groups. That is why gaps and cluster sizes are not trustworthy.</p>
+
+  <div class="widget">
+    <h4>Feel the asymmetry of the KL cost <span class="tag">interactive · exact formula</span></h4>
+    <p class="hint">Set the "true" high-D probability p and the map's probability q, and see the exact cost p·log(p/q). Try p high / q low (tearing neighbours apart) versus p low / q high (putting strangers together).</p>
+    <div class="control-row">
+      <label class="sans" style="font-weight:700; color:var(--p-700);">p (high-D neighbourliness):</label>
+      <input type="range" id="pSlider" min="0.01" max="0.99" step="0.01" value="0.8">
+      <span class="readout" id="pReadout">0.80</span>
+    </div>
+    <div class="control-row">
+      <label class="sans" style="font-weight:700; color:var(--p-700);">q (map neighbourliness):</label>
+      <input type="range" id="qSlider" min="0.01" max="0.99" step="0.01" value="0.2">
+      <span class="readout" id="qReadout">0.20</span>
+    </div>
+    <div class="big-stat" style="margin-top:14px;">
+      <div class="num" id="klCostNum">—</div>
+      <div class="lbl">cost = p·log(p/q)</div>
+    </div>
+    <p class="hint" style="margin-top:12px; margin-bottom:0;" id="klCostCaption"></p>
+  </div>
+
+  <p class="hint" style="font-family:inherit; color:var(--ink-soft);"><strong>Perplexity</strong> is the effective number of neighbours considered per point. Small values give a local view (fragmented); large values give a more global view (but slower and blurrier).</p>
+</section>
+
+<!-- QUIZ 1 -->
+<div class="quiz" data-quiz>
+  <div class="qlabel">Quick check</div>
+  <h4>Meera doubles the perplexity from 30 to 60. Which statement about the effect is most accurate?</h4>
+  <button class="opt" data-correct="true">The map becomes more global because each point considers more neighbours, usually increasing runtime.</button>
+  <button class="opt" data-correct="false">The number of points in the map doubles, while the optimisation objective remains unchanged.</button>
+  <button class="opt" data-correct="false">The map becomes more local because each point focuses on fewer nearby points.</button>
+  <button class="opt" data-correct="false">The KL divergence is no longer minimised because the neighbourhood size has changed.</button>
+  <div class="feedback"><strong>Correct.</strong> Perplexity is roughly the effective number of neighbours. A larger value means each point looks at more neighbours, so the view shifts from local toward global, and the extra neighbour computations make the run slower. It doesn't change the number of points, and KL divergence is still the objective.</div>
+</div>
+
+<!-- ============ 2. TEST BED ============ -->
+<section class="block" id="sec2">
+  <div class="kicker">Section 2</div>
+  <h2><span class="num">2</span>A Better Test Bed: Returned Items (Fashion‑MNIST)</h2>
+  <p>Digits are a good start, but they have little hierarchy. Fashion-MNIST has 10 item types in 28×28 images (784 features), and the categories have a real <strong>story</strong>:</p>
+  <ul>
+    <li>T-shirt, shirt, pullover, coat and dress are all tops or upper-body clothing.</li>
+    <li>Sandal, sneaker and ankle boot are all footwear.</li>
+    <li>Trousers and bags are different from everything else.</li>
+  </ul>
+  <p>A good map should put <strong>footwear together, clothing together, and bags and trousers apart</strong> — perfect for checking whether a method keeps both <strong>local</strong> and <strong>global</strong> structure. 8,000 random images are reduced to 50 dimensions with PCA first (the standard recipe from Class 2).</p>
+
+  <figure>
+    <img src="https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/247/162/original/Screenshot_2026-10-15_182858.png?1792069151" alt="Row of six example Fashion-MNIST item images including a T-shirt, trouser, pullover, dress, coat and sandal" loading="lazy">
+    <figcaption>Fashion-MNIST sample categories — 8,000 images, 784 pixels each, reduced to 50 dimensions by PCA.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ BASELINE T-SNE ============ -->
+<section class="block" id="sec2b">
+  <h3>Baseline t-SNE run</h3>
+  <figure>
+    <img src="https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/247/163/original/Screenshot_2026-10-15_182935.png?1792069183" alt="t-SNE scatter plot of 8000 returned-item photos showing distinct colour-coded islands for each clothing category" loading="lazy">
+    <figcaption>t-SNE on 8,000 returned-item photos — finished in 100.5 s.</figcaption>
+  </figure>
+  <ul>
+    <li>t-SNE separates the categories into clear islands — the local structure we wanted.</li>
+    <li>Look at <strong>where the islands sit</strong>. Do footwear islands sit near each other? Is bag far from clothing? This is only partly reliable, because gaps in a t-SNE map are not true distances.</li>
+    <li>The run took a noticeable amount of time on just 8,000 points. Meera needs millions.</li>
+  </ul>
+
+  <h3>Where t-SNE hurts (the problem UMAP is built to ease)</h3>
+  <div id="painPointsAccordion"></div>
+
+  <p class="hint" style="font-family:inherit; color:var(--ink-soft);">Extra reading: the Distill article "How to Use t-SNE Effectively" (distill.pub/2016/misread-tsne) shows many ways t-SNE pictures can mislead.</p>
+</section>
+
+<!-- ============ 3. UMAP INTUITION ============ -->
+<section class="block" id="sec3">
+  <div class="kicker">Section 3</div>
+  <h2><span class="num">3</span>UMAP Intuition: Build a Graph, Then Draw It</h2>
+  <p><strong>UMAP</strong> stands for <strong>Uniform Manifold Approximation and Projection</strong>. The name is heavy, but the idea is simple:</p>
+  <blockquote class="idea">Describe the data as a weighted neighbourhood graph, then find a 2D layout whose graph looks the same.</blockquote>
+
+  <div class="stepper" id="umapStepper" style="display:flex; gap:6px; margin-bottom:18px; flex-wrap:wrap;"></div>
+  <div class="step-view" id="umapStepView" style="min-height:170px;"></div>
+
+  <figure>
+    <img src="https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/244/681/original/K-Nearest_Neighbours_and_Overlap.png?1791286044" alt="Diagram of growing circles around data points, showing how overlapping circles create fuzzy connection weights between nearest neighbours" loading="lazy">
+  </figure>
+
+  <h3>Why is UMAP faster?</h3>
+  <ol>
+    <li>It works with a <strong>sparse kNN graph</strong> (each point has only about k neighbours that matter), rather than similarities between all pairs of points.</li>
+    <li>It does not need to normalise over all pairs.</li>
+    <li>The optimisation samples edges and a few random "push apart" points, instead of touching every pair at every step.</li>
+  </ol>
+
+  <p class="hint" style="font-family:inherit; color:var(--ink-soft);">The formal theory (fuzzy simplicial sets, topology) is beyond our scope. What matters is: <strong>neighbourhood graph in, matching layout out</strong>.</p>
+</section>
+
+<!-- QUIZ 2 -->
+<div class="quiz" data-quiz>
+  <div class="qlabel">Quick check</div>
+  <h4>Which pair of ideas best explains why UMAP typically runs faster than t-SNE on large datasets?</h4>
+  <button class="opt" data-correct="false">It uses a larger learning rate and skips neighbourhood calculations.</button>
+  <button class="opt" data-correct="false">It removes half the data points and avoids gradient-based optimisation.</button>
+  <button class="opt" data-correct="true">It uses a sparse neighbour graph and samples edges during optimisation.</button>
+  <button class="opt" data-correct="false">It relies exclusively on GPUs and avoids CPU-based computations.</button>
+  <div class="feedback"><strong>Correct.</strong> UMAP's graph is sparse (only about k edges per point), and its optimisation samples edges and a few random repulsive pairs rather than considering every pair at every step. It doesn't discard data, ignore neighbours, or require GPUs.</div>
+</div>
+
+<!-- ============ UMAP VS T-SNE TIMING ============ -->
+<section class="block" id="sec4">
+  <div class="kicker">Section 4</div>
+  <h2><span class="num">4</span>UMAP vs. t-SNE: Timing and Interpretation</h2>
+
+  <div class="widget">
+    <h4>Measured runtime, same 8,000-point dataset <span class="tag">real measurement</span></h4>
+    <p class="hint">Default-style settings, same machine, same data. (random_state forces UMAP single-threaded here, so this timing is conservative.)</p>
+    <div class="bar-compare">
+      <div class="bar-row"><div class="bar-label">t-SNE</div><div class="bar-track"><div class="bar-fill" style="width:100%;"><span>100.5 s</span></div></div></div>
+      <div class="bar-row"><div class="bar-label">UMAP</div><div class="bar-track"><div class="bar-fill" style="width:53.7%; background:linear-gradient(90deg,var(--p-500),var(--p-300));"><span>54.0 s</span></div></div></div>
+    </div>
+  </div>
+
+  <figure>
+    <img src="https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/247/165/original/Screenshot_2026-10-15_183018.png?1792069227" alt="Side-by-side t-SNE and UMAP scatter plots of Fashion-MNIST, both showing ten coloured clusters, with runtime labelled in each title" loading="lazy">
+    <figcaption>t-SNE (100 s) vs. UMAP (54 s) on the same 8,000 returned-item photos.</figcaption>
+  </figure>
+
+  <h3>Interpretation: look for three things</h3>
+  <ol>
+    <li><strong>Local structure.</strong> Are individual categories grouped into islands? Usually both methods manage this — UMAP's islands often look tighter, with more empty space between them.</li>
+    <li><strong>Global layout.</strong> Do related categories (footwear: sandal, sneaker, ankle boot; tops: T-shirt, shirt, pullover, coat) sit <strong>close together</strong>, with bags and trousers off by themselves? UMAP often shows a more interpretable arrangement, though t-SNE can show it too with PCA initialisation — don't expect a huge gap.</li>
+    <li><strong>Hard cases.</strong> Shirt, T-shirt, pullover and coat blend together in both maps. That's not a failure — those items really do look alike, and the map is telling you something true about the data.</li>
+  </ol>
+
+  <div class="callout rule">
+    <span class="label">A note on claims you'll read online</span>
+    <p style="margin-bottom:0;">Published demos report UMAP running many times faster than t-SNE. The exact ratio depends on hardware, library versions and settings — which is why it was <strong>measured directly</strong> above. Likewise, "UMAP preserves global structure and t-SNE does not" is too simple. A large share of the difference comes from initialisation, so judge it on your own data.</p>
+  </div>
+
+  <figure>
+    <img src="https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/244/683/original/Fashion-MNIST_Embeddings__t-SNE_vs_UMAP.png?1791286214" alt="Comparison infographic of t-SNE and UMAP embeddings of Fashion-MNIST, highlighting local clusters and global arrangement differences" loading="lazy">
+  </figure>
+
+  <div class="callout ai">
+    <span class="label">AI exploration · is UMAP really better, or just initialised better?</span>
+    <p><em>"I have a 50-dimensional array X50 and labels y (Fashion-MNIST, 10 classes). Write Python code that compares four embeddings: sklearn TSNE with init='random', TSNE with init='pca', umap.UMAP with init='random', and umap.UMAP with init='spectral'. Plot all four side by side, and compute a simple global-structure score: the correlation between pairwise distances of the 10 class centroids in the original 50D space and in each 2D embedding. Explain what the scores tell me about how much of the 'global structure' comes from initialisation rather than the algorithm."</em></p>
+    <p style="margin-bottom:0;">Then answer: which settings produce the best centroid-distance correlation? How different are t-SNE-with-PCA-init and UMAP? What would you now say to someone who claims "UMAP preserves global structure and t-SNE doesn't"?</p>
+  </div>
+</section>
+
+<!-- ============ UMAP DIALS ============ -->
+<section class="block" id="sec5">
+  <div class="kicker">Section 5</div>
+  <h2><span class="num">5</span>UMAP's Two Main Dials</h2>
+
+  <h3><code>n_neighbors</code>: how big is a "neighbourhood"?</h3>
+  <p>The number of nearest neighbours used to build the graph — much like perplexity in t-SNE.</p>
+
+  <div class="widget">
+    <h4>n_neighbors: local detail vs. global layout <span class="tag">interactive</span></h4>
+    <p class="hint">Illustrative schematic of the trade-off, not literal output — compare with the real grid below.</p>
+    <div class="btn-row" id="nnToggle">
+      <button class="btn" data-nn="small">Small (~5)</button>
+      <button class="btn active" data-nn="mid">Moderate (~15)</button>
+      <button class="btn" data-nn="large">Large (100+)</button>
+    </div>
+    <svg class="viz" id="nnSvg" viewBox="0 0 640 200" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Schematic illustration of how n_neighbors affects fragmentation versus global smoothness"></svg>
+    <p class="hint" style="margin-top:10px; margin-bottom:0;" id="nnCaption"></p>
+  </div>
+
+  <h3><code>min_dist</code>: how tightly may points be packed in the map?</h3>
+  <p>The minimum distance allowed between points in the 2D embedding.</p>
+
+  <div class="widget">
+    <h4>min_dist: packing tightness <span class="tag">interactive</span></h4>
+    <p class="hint">Same underlying neighbourhood structure, different packing — illustrative schematic.</p>
+    <div class="control-row">
+      <label for="mdSlider" class="sans" style="font-weight:700; color:var(--p-700);">min_dist:</label>
+      <input type="range" id="mdSlider" min="0" max="0.99" step="0.01" value="0.1">
+      <span class="readout" id="mdReadout">0.10</span>
+    </div>
+    <svg class="viz" id="mdSvg" viewBox="0 0 640 200" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Schematic illustration showing points packed tightly at low min_dist and spread diffusely at high min_dist"></svg>
+  </div>
+
+  <div class="card" style="background:var(--p-100); border:none;">
+    <p style="margin:0;"><code>min_dist</code> changes <strong>how the picture looks</strong>, while <code>n_neighbors</code> changes <strong>what the algorithm considers to be structure</strong>.</p>
+  </div>
+
+  <figure>
+    <img src="https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/244/684/original/UMAP_Mammoth_Embedding_Comparison.png?1791286283" alt="Comparison of UMAP mammoth-shaped embeddings under different n_neighbors and min_dist settings" loading="lazy">
+  </figure>
+
+  <h3>The real sweep: six configurations on 4,000 photos</h3>
+  <figure>
+    <img src="https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/247/166/original/Screenshot_2026-10-15_183144.png?1792069313" alt="Grid of three UMAP embeddings with n_neighbors set to 5, 15 and 100, showing fragmented islands at low values and smoother global layout at high values" loading="lazy">
+    <figcaption>Top row: n_neighbors = 5, 15, 100 (min_dist fixed at 0.1).</figcaption>
+  </figure>
+  <figure>
+    <img src="https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/247/167/original/Screenshot_2026-10-15_183211.png?1792069362" alt="Grid of three UMAP embeddings with min_dist set to 0.0, 0.5 and 0.99, showing tight clumps at low values and diffuse spread-out clouds at high values" loading="lazy">
+    <figcaption>Bottom row: min_dist = 0.0, 0.5, 0.99 (n_neighbors fixed at 15).</figcaption>
+  </figure>
+
+  <ul>
+    <li><strong>Top row:</strong> the smallest n_neighbors gives fragmented, noisy islands. The largest gives smoother, more global arrangements with less fine detail.</li>
+    <li><strong>Bottom row:</strong> with min_dist = 0.0, points collapse into tight blobs. With min_dist = 0.99, the same islands spread into diffuse clouds. The neighbourhood structure is the same — only the packing differs.</li>
+  </ul>
+</section>
+
+<!-- QUIZ 3 -->
+<div class="quiz" data-quiz>
+  <div class="qlabel">Quick check</div>
+  <h4>Meera's map shows each category as a few tight, fragmented specks and no overall layout. She wants smoother, more global structure without changing how densely points are packed. Which change should she try?</h4>
+  <button class="opt" data-correct="false">Decrease min_dist to 0.0</button>
+  <button class="opt" data-correct="true">Increase n_neighbors</button>
+  <button class="opt" data-correct="false">Decrease n_neighbors to 2</button>
+  <button class="opt" data-correct="false">Increase min_dist to 0.99</button>
+  <div class="feedback"><strong>Correct.</strong> Fragmentation with weak global layout is a sign that each point sees too few neighbours. Raising n_neighbors broadens the neighbourhoods and restores overall structure. min_dist only changes how tightly points are packed, not what structure is found, and a smaller n_neighbors would make fragmentation worse.</div>
+</div>
+
+<div class="callout ai">
+  <span class="label">AI exploration · a tuning checklist for a new dataset</span>
+  <p><em>"I want a repeatable procedure for choosing UMAP hyperparameters for a new unlabeled dataset. Write a Python function that runs UMAP over n_neighbors in [5, 15, 50, 150] and min_dist in [0.0, 0.3], and for each embedding computes a trustworthiness score using sklearn.manifold.trustworthiness. Plot a small grid of the maps with the scores in the titles. Explain what trustworthiness measures, and why I should still look at the pictures rather than just pick the highest score."</em></p>
+  <p style="margin-bottom:0;">Then answer: does the highest trustworthiness score give the map you'd pick by eye? Why might they disagree?</p>
+</div>
+
+<!-- ============ 5. TRANSFORM ============ -->
+<section class="block" id="sec6">
+  <div class="kicker">Section 6</div>
+  <h2><span class="num">6</span>The Feature Meera Needed: Placing New Photos on the Old Map</h2>
+  <p>Requirement 3: "drop in today's photos without redrawing the map." t-SNE cannot do this — it has only coordinates. <strong>UMAP can</strong>, because it learns how to connect a new point to its neighbours among the existing points and places it accordingly. <code>transform()</code> does this approximately.</p>
+  <p><strong>Test:</strong> fit UMAP on the first 6,000 photos ("yesterday's" data), then transform the other 2,000 ("today's" photos). Check whether the new photos land near old photos of the same category.</p>
+
+  <div class="widget">
+    <h4>Did new photos land in the right neighbourhood? <span class="tag">real measurement</span></h4>
+    <div class="big-stat">
+      <div class="num">74.9%</div>
+      <div class="lbl">of new photos have their 10 nearest old neighbours matching their true category</div>
+    </div>
+  </div>
+
+  <figure>
+    <img src="https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/247/168/original/Screenshot_2026-10-15_183321.png?1792069410" alt="Scatter plot showing grey points from yesterday's UMAP map with today's new colour-coded photos placed on top, landing inside the existing category islands" loading="lazy">
+    <figcaption>Today's photos (coloured) placed on yesterday's UMAP map (grey) via transform().</figcaption>
+  </figure>
+
+  <ul>
+    <li>New points land inside the existing islands, and the map did not move — exactly what the returns managers wanted.</li>
+    <li>The placement is <strong>approximate</strong>. If today's photos contain something genuinely new (a product type never seen before), <code>transform</code> will force it into the nearest existing region. Monitor for that.</li>
+    <li>Over time, refit the map occasionally and accept that the layout will change.</li>
+  </ul>
+</section>
+
+<!-- QUIZ 4 -->
+<div class="quiz" data-quiz>
+  <div class="qlabel">Quick check</div>
+  <h4>SwiftParcel wants (1) a daily-refreshed map, (2) new photos added without moving existing points, and (3) a quick overview with a small number of settings to tune. Which choice fits best, and what is the main caveat?</h4>
+  <button class="opt" data-correct="false">PCA alone, because it always separates complex image categories into distinct islands.</button>
+  <button class="opt" data-correct="true">UMAP with transform, because new points can be placed approximately, and settings still need tuning.</button>
+  <button class="opt" data-correct="false">t-SNE, because it supports straightforward out-of-sample placement without refitting.</button>
+  <button class="opt" data-correct="false">Any of the three, because each method preserves existing positions identically.</button>
+  <div class="feedback"><strong>Correct.</strong> UMAP is faster and supports transform for new points. The caveat: placing new points is an approximation, and hyperparameters (n_neighbors, min_dist) still matter. PCA also supports transform and is far faster, but it's linear and won't separate the islands as well. t-SNE has no transform, so it fails requirement 2.</div>
+</div>
+
+<!-- ============ 6. WHERE UMAP MISLEADS ============ -->
+<section class="block" id="sec7">
+  <div class="kicker">Section 7</div>
+  <h2><span class="num">7</span>Where UMAP Misleads</h2>
+  <p>UMAP pictures are persuasive, which is exactly why they need care.</p>
+
+  <div id="misleadAccordion"></div>
+
+  <h3>Demo 1: pure random noise</h3>
+  <p>There is no structure at all in the data below — just independent random numbers. What does UMAP draw?</p>
+  <figure>
+    <img src="https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/247/170/original/Screenshot_2026-10-15_183400.png?1792069449" alt="Three UMAP scatter plots of pure random noise at different n_neighbors settings, each showing apparent clumps and strands despite no real structure in the data" loading="lazy">
+    <figcaption>UMAP of pure noise at n_neighbors = 5, 15, 50 — clumps and strands appear with no real structure underneath.</figcaption>
+  </figure>
+  <p>The data has no groups, yet at small n_neighbors you'll typically see clumps and strands, as UMAP faithfully draws the accidental neighbourhoods that random points have.</p>
+
+  <div class="card" style="background:var(--p-100); border:none;">
+    <p style="margin:0;">A pretty island on a UMAP map is <strong>a hypothesis, not a finding</strong>. Confirm it in the original data (or with a different seed or setting) before acting on it.</p>
+  </div>
+
+  <h3>Demo 2: a dense cluster inside a sparse one</h3>
+  <p>UMAP preserves neighbourhood <em>connectivity</em> but not <em>density</em>, which can hide one kind of structure: a tight, dense group sitting inside a much more spread-out group.</p>
+  <figure>
+    <img src="https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/247/171/original/Screenshot_2026-10-15_183432.png?1792069480" alt="Side-by-side UMAP and t-SNE embeddings of a dense core cluster nested inside a sparse surrounding cloud, comparing how clearly each method separates the two" loading="lazy">
+    <figcaption>UMAP (left) vs. t-SNE (right) on a dense core nested inside a sparse shell.</figcaption>
+  </figure>
+  <p>Compare how clearly each method separates the dense core from the surrounding cloud. The documented weakness: UMAP can fail to keep the two apart, because both groups look like well-connected neighbourhoods and UMAP doesn't preserve density. t-SNE's per-point scaling often separates them more cleanly. Your own run may differ in detail. Variants of UMAP that try to preserve density exist (for example, densMAP).</p>
+
+  <figure>
+    <img src="https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/244/687/original/Dimensionality_Reduction_Clustering_Comparison.png?1791286684" alt="Diagram comparing how different dimensionality reduction methods handle nested cluster structure" loading="lazy">
+  </figure>
+</section>
+
+<!-- QUIZ 5 -->
+<div class="quiz" data-quiz>
+  <div class="qlabel">Quick check</div>
+  <h4>A UMAP map of delivery scans shows one large island and one small island. The analyst reports: "The large island is a much bigger group of scans, and its distance from the small island shows the two types are very different." What is the correct response?</h4>
+  <button class="opt" data-correct="false">Both claims are reliable if the embedding uses a sufficiently small min_dist.</button>
+  <button class="opt" data-correct="false">The island sizes are reliable, but distances between islands are not.</button>
+  <button class="opt" data-correct="false">Both claims are reliable because UMAP preserves the original distances.</button>
+  <button class="opt" data-correct="true">Neither claim is guaranteed; verify group sizes and differences in the original data.</button>
+  <div class="feedback"><strong>Correct.</strong> Island size is influenced by density and settings, and distances between islands are not preserved as true distances. What can be trusted is mainly that points in the same island are neighbours. Claims about group size or dissimilarity should be verified with counts and distances in the original (or PCA) space — min_dist has no bearing on that.</div>
+</div>
+
+<!-- ============ 7. CHOOSING A TOOL ============ -->
+<section class="block" id="sec8">
+  <div class="kicker">Section 8</div>
+  <h2><span class="num">8</span>Choosing Between PCA, t-SNE and UMAP</h2>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th></th><th>PCA</th><th>t-SNE</th><th>UMAP</th></tr>
+      <tr><td>Idea</td><td>Directions of maximum variance</td><td>Match neighbour probabilities</td><td>Match a fuzzy neighbourhood graph</td></tr>
+      <tr><td>Linear?</td><td>Yes</td><td>No</td><td>No</td></tr>
+      <tr><td>Speed</td><td>Very fast</td><td>Slow</td><td>Fast (often much faster than t-SNE)</td></tr>
+      <tr><td>New data (transform)</td><td>Yes, exact</td><td>No</td><td>Yes, approximate</td></tr>
+      <tr><td>Reproducible</td><td>Yes</td><td>No (seed-dependent)</td><td>No (seed-dependent)</td></tr>
+      <tr><td>Global layout</td><td>Preserved by design</td><td>Weak (good with PCA init)</td><td>Often better, partly due to initialisation</td></tr>
+      <tr><td>Cluster separation</td><td>Weak on curved structure</td><td>Strong</td><td>Strong</td></tr>
+      <tr><td>Key dials</td><td>n_components</td><td>perplexity</td><td>n_neighbors, min_dist</td></tr>
+      <tr><td>Sizes/gaps meaningful?</td><td>Yes (as variance)</td><td>No</td><td>No</td></tr>
+      <tr><td>Dense-in-sparse structure</td><td>Not a goal</td><td>Usually handled</td><td>Can fail</td></tr>
+      <tr><td>Best for</td><td>Compression, preprocessing, first look</td><td>Careful visualisation on moderate data</td><td>Visualisation at scale, new-data placement, preprocessing</td></tr>
+    </table>
+  </div>
+
+  <h3>A practical workflow</h3>
+  <ol>
+    <li>Scale the features (when units differ) and run <strong>PCA to about 50 dimensions</strong>.</li>
+    <li>Draw a <strong>UMAP</strong> map for speed, and a <strong>t-SNE</strong> map as a cross-check.</li>
+    <li>Try several settings. Trust only the structure that <strong>survives</strong> across settings and methods.</li>
+    <li>Treat every island as a hypothesis, and verify it in the original data.</li>
+  </ol>
+
+  <figure>
+    <img src="https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/244/688/original/Dimensionality_Reduction_Method_Guide.png?1791286752" alt="Guide summarising when to choose PCA, t-SNE or UMAP based on dataset size, speed requirements and new-data placement needs" loading="lazy">
+  </figure>
+
+  <div class="callout ai">
+    <span class="label">AI exploration · UMAP as a bridge to clustering</span>
+    <p><em>"I have X50 (50D PCA features of Fashion-MNIST). Write code that (1) runs KMeans with k=10 directly on X50, (2) runs UMAP to 10 dimensions and then KMeans with k=10 on that, and (3) compares both clusterings to the true labels using adjusted_rand_score, while noting that labels are only used for evaluation. Then explain why reducing dimensions with UMAP before clustering can help, and what risks it introduces (hint: cluster sizes and distances after UMAP)."</em></p>
+    <p style="margin-bottom:0;">Then answer: which version matches the true categories better? Given Quiz 5, why should you be careful about trusting the clusters found in UMAP space?</p>
+  </div>
+</section>
+
+<!-- ============ WRAP-UP ============ -->
+<section class="block" id="sec9">
+  <div class="story">
+    <h3>Wrap-Up: Closing the SwiftParcel Story</h3>
+    <p>Three classes ago, Meera had millions of scans, no labels, and a question she couldn't answer: "What does this data look like?" Today she walks into the returns department with the final answer.</p>
+    <ul>
+      <li><strong>Storage and speed (Class 1):</strong> PCA shrank each image from 784 numbers to a few dozen, so the pipeline became light enough to run every day.</li>
+      <li><strong>Neighbourhood maps (Class 2):</strong> t-SNE turned the overlapping blob of digits into distinct islands, and taught her which parts of a map can be trusted.</li>
+      <li style="margin-bottom:0;"><strong>A map that scales (Class 3):</strong> UMAP now refreshes the returned-item map daily, places each morning's new photos onto the existing layout with <code style="color:#fff;">transform</code>, and keeps the map stable for managers who've learned where "shoes" and "bags" live.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">The pipeline, not a single algorithm</h3>
+    <p style="margin-bottom:0;"><strong>Scale → PCA to about 50 dimensions → UMAP for the daily map, with t-SNE as a cross-check on anything surprising.</strong> Before anyone acts on an island, Meera confirms it in the original data. The managers get a map they can use, and the team gets a clear rule for when the picture can be trusted.</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>Question</th><th>Tool</th></tr>
+      <tr><td>How do I compress the data and find its main directions of variation?</td><td>PCA</td></tr>
+      <tr><td>How do I see local neighbourhoods in a map?</td><td>t-SNE</td></tr>
+      <tr><td>How do I do that at scale, and place new points on an existing map?</td><td>UMAP</td></tr>
+    </table>
+  </div>
+
+  <div class="takeaways">
+    <h3>Key takeaways</h3>
+    <ul>
+      <li>t-SNE learns <strong>2D coordinates directly</strong> by minimising KL divergence. KL is asymmetric, so it protects local neighbourhoods. It's slow and has no transform.</li>
+      <li><strong>UMAP</strong> builds a <strong>fuzzy k-nearest-neighbour graph</strong>, then finds a 2D layout whose graph matches it. It's faster because the graph is sparse and the optimisation samples edges.</li>
+      <li><strong>n_neighbors</strong> controls what counts as structure (local vs. global). <strong>min_dist</strong> controls how tightly points pack in the picture.</li>
+      <li>UMAP supports approximate <strong>transform</strong> for new data, which matters in production.</li>
+      <li>Both methods can mislead: island sizes and gaps are not meaningful, noise can look like structure, results change with seeds, and UMAP can blur dense-in-sparse structure.</li>
+      <li>"UMAP is always better" and "UMAP preserves global structure and t-SNE does not" are too simple — measure on your own data.</li>
+      <li>Treat every island as a <strong>hypothesis</strong>, and verify it in the original data before acting.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="fname">t-SNE &amp; UMAP post read</div>
+  <div>An interactive learning article · built from course content on t-SNE and UMAP</div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- Reading progress ---------- */
+  var track = document.getElementById('progressTrack');
+  function updateProgress(){
+    var h = document.documentElement;
+    var scrollTop = h.scrollTop || document.body.scrollTop;
+    var scrollH = (h.scrollHeight || document.body.scrollHeight) - h.clientHeight;
+    var pct = scrollH > 0 ? (scrollTop/scrollH)*100 : 0;
+    track.style.width = pct + '%';
+  }
+  document.addEventListener('scroll', updateProgress, {passive:true});
+  updateProgress();
+
+  /* ---------- Quizzes ---------- */
+  document.querySelectorAll('[data-quiz]').forEach(function(quiz){
+    var opts = quiz.querySelectorAll('.opt');
+    var fb = quiz.querySelector('.feedback');
+    var answered = false;
+    opts.forEach(function(opt){
+      opt.addEventListener('click', function(){
+        if(answered) return;
+        answered = true;
+        opts.forEach(function(o){
+          if(o.dataset.correct === 'true'){ o.classList.add('correct'); }
+          else if(o === opt){ o.classList.add('wrong'); }
+        });
+        fb.classList.add('show');
+      });
+    });
+  });
+
+  /* ---------- Accordion builder ---------- */
+  function buildAccordion(wrapId, items){
+    var wrap = document.getElementById(wrapId);
+    items.forEach(function(item){
+      var el = document.createElement('div');
+      el.className = 'accordion-item';
+      el.innerHTML =
+        '<button class="accordion-head" aria-expanded="false">'+
+          '<span>'+item.t+'</span><span class="chevron">▾</span>'+
+        '</button>'+
+        '<div class="accordion-body"><div>'+item.body+'</div></div>';
+      wrap.appendChild(el);
+      var head = el.querySelector('.accordion-head');
+      var body = el.querySelector('.accordion-body');
+      head.addEventListener('click', function(){
+        var isOpen = el.classList.toggle('open');
+        head.setAttribute('aria-expanded', isOpen);
+        body.style.maxHeight = isOpen ? body.scrollHeight + 'px' : 0;
+      });
+    });
+  }
+
+  buildAccordion('painPointsAccordion', [
+    {t:"Slow", body:"<p style='margin:0;'>The algorithm normalises over all pairs of points, and minimises a cost that touches every pair, so time grows quickly with data size. One run on a big dataset can take hours.</p>"},
+    {t:"Hard to tune", body:"<p style='margin:0;'>You need to try several perplexities, and every try is slow.</p>"},
+    {t:"No new data", body:"<p style='margin:0;'>The \"model\" is a set of coordinates, with no transform.</p>"},
+    {t:"Weak global layout", body:"<p style='margin:0;'>Distances between islands are not meaningful.</p>"}
+  ]);
+
+  buildAccordion('misleadAccordion', [
+    {t:"Hyperparameters really matter", body:"<p style='margin:0;'>There is no single right setting. You have to try several.</p>"},
+    {t:"Cluster sizes are not meaningful", body:"<p style='margin:0;'>A big island does not mean a big group.</p>"},
+    {t:"Distances between clusters are not meaningful", body:"<p style='margin:0;'>Which islands are \"far\" or \"near\" is partly an artefact.</p>"},
+    {t:"Noise can look like structure", body:"<p style='margin:0;'>Even random data can show clumps and filaments.</p>"},
+    {t:"Results vary by run", body:"<p style='margin:0;'>The same settings with a different random seed give a different picture. Fix random_state for reproducibility, at the cost of speed.</p>"}
+  ]);
+
+  /* ---------- KL asymmetry widget ---------- */
+  (function(){
+    var pSlider = document.getElementById('pSlider');
+    var qSlider = document.getElementById('qSlider');
+    var pReadout = document.getElementById('pReadout');
+    var qReadout = document.getElementById('qReadout');
+    var numEl = document.getElementById('klCostNum');
+    var capEl = document.getElementById('klCostCaption');
+    function update(){
+      var p = +pSlider.value, q = +qSlider.value;
+      pReadout.textContent = p.toFixed(2);
+      qReadout.textContent = q.toFixed(2);
+      var cost = p * Math.log(p/q);
+      numEl.textContent = cost.toFixed(3);
+      if(p > q + 0.15){
+        capEl.textContent = 'p ≫ q: these were neighbours in high-D but are far apart in the map. Tearing neighbours apart is expensive — the cost is high, so the optimiser works hard to pull them back together.';
+      } else if(q > p + 0.15){
+        capEl.textContent = 'q ≫ p: these were strangers in high-D but ended up close in the map. Putting strangers together is cheap — the cost stays low, so the optimiser barely objects.';
+      } else {
+        capEl.textContent = 'p ≈ q: the map agrees with the original neighbourhood here — low cost either way.';
+      }
+    }
+    pSlider.addEventListener('input', update);
+    qSlider.addEventListener('input', update);
+    update();
+  })();
+
+  /* ---------- UMAP steps ---------- */
+  (function(){
+    var steps = [
+      {title:"Build a graph in the original space", body:"Every data point is a node. Each node connects to its k nearest neighbours (n_neighbors sets k). Each connection gets a weight between 0 and 1 — how likely the two points really belong together. Weights are measured relative to each point's own nearest neighbour, so dense and sparse regions both stay connected (a similar spirit to t-SNE's per-point sigma)."},
+      {title:"Build a starting layout", body:"UMAP gives the points a smart starting position in 2D from the graph structure — a spectral layout. This is one reason UMAP often keeps the overall arrangement sensible. t-SNE with PCA initialisation does something similar."},
+      {title:"Make the 2D graph match the original graph", body:"In 2D, UMAP defines edge weights too (a curve that falls off with distance, similar in spirit to the t-distribution). It nudges points so strong edges pull their endpoints together and missing edges push points apart. The mismatch is measured with cross-entropy — the role KL divergence plays in t-SNE."}
+    ];
+    var dotsWrap = document.getElementById('umapStepper');
+    var view = document.getElementById('umapStepView');
+    steps.forEach(function(s,i){
+      var dot = document.createElement('button');
+      dot.className = 'step-dot' + (i===0?' active':'');
+      dot.style.cssText = 'flex:1; min-width:30px; height:6px; border-radius:4px; background:var(--p-200); cursor:pointer; border:none;';
+      dot.setAttribute('aria-label','Step '+(i+1));
+      dot.addEventListener('click', function(){ show(i); });
+      dotsWrap.appendChild(dot);
+    });
+    function show(i){
+      Array.from(dotsWrap.children).forEach(function(d,idx){
+        d.style.background = idx===i ? 'linear-gradient(90deg,var(--p-600),var(--p-400))' : 'var(--p-200)';
+      });
+      view.innerHTML = '<div class="step-num" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; background:var(--p-600); color:#fff; font-weight:800; font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Inter,sans-serif; margin-bottom:10px; font-size:14px;">'+(i+1)+'</div><h4 style="margin:0 0 8px;">'+steps[i].title+'</h4><p style="margin:0; color:var(--ink-soft);" class="sans">'+steps[i].body+'</p>';
+    }
+    show(0);
+  })();
+
+  /* ---------- n_neighbors schematic ---------- */
+  (function(){
+    var svg = document.getElementById('nnSvg');
+    var btns = document.querySelectorAll('#nnToggle .btn');
+    var caption = document.getElementById('nnCaption');
+    function mulberry32(a){ return function(){ var t=a+=0x6D2B79F5; t=Math.imul(t^t>>>15,t|1); t^=t+Math.imul(t^t>>>7,t|61); return ((t^t>>>14)>>>0)/4294967296; }; }
+    var descs = {
+      small: "Small n_neighbors (~5): UMAP sees only tiny neighbourhoods. It captures fine local detail but loses the overall layout, and a single group can break into many fragments.",
+      mid: "Moderate n_neighbors (~15, often the default): a balance between local detail and global layout.",
+      large: "Large n_neighbors (100+): UMAP sees broad neighbourhoods. The overall layout is better preserved, but fine local detail gets smoothed out."
+    };
+    function draw(mode){
+      var rand = mulberry32(mode==='small'?1:mode==='mid'?2:3);
+      var w=640,h=200;
+      var clusterCount = mode==='small' ? 7 : mode==='mid' ? 4 : 2;
+      var spread = mode==='small' ? 18 : mode==='mid' ? 32 : 60;
+      var parts = [];
+      var centers = [];
+      for(var c=0;c<clusterCount;c++){
+        centers.push([80 + rand()*480, 50 + rand()*100]);
+      }
+      centers.forEach(function(center, ci){
+        var n = mode==='large' ? 10 : 14;
+        for(var i=0;i<n;i++){
+          var x = center[0] + (rand()-0.5)*spread*2;
+          var y = center[1] + (rand()-0.5)*spread*2;
+          parts.push('<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="4" fill="var(--p-'+(600-ci*0%200)+')" opacity="0.8"/>'.replace('p-'+(600-ci*0%200), 'p-600'));
+        }
+      });
+      svg.innerHTML = parts.join('');
+      caption.textContent = descs[mode];
+    }
+    btns.forEach(function(btn){
+      btn.addEventListener('click', function(){
+        btns.forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+        draw(btn.dataset.nn);
+      });
+    });
+    draw('mid');
+  })();
+
+  /* ---------- min_dist schematic ---------- */
+  (function(){
+    var svg = document.getElementById('mdSvg');
+    var slider = document.getElementById('mdSlider');
+    var readout = document.getElementById('mdReadout');
+    function mulberry32(a){ return function(){ var t=a+=0x6D2B79F5; t=Math.imul(t^t>>>15,t|1); t^=t+Math.imul(t^t>>>7,t|61); return ((t^t>>>14)>>>0)/4294967296; }; }
+    var rand = mulberry32(7);
+    var baseCenters = [[140,70],[330,110],[500,60]];
+    var basePoints = [];
+    baseCenters.forEach(function(c){
+      for(var i=0;i<16;i++){
+        basePoints.push({cx:c[0], cy:c[1], ox:(rand()-0.5), oy:(rand()-0.5)});
+      }
+    });
+    function draw(md){
+      var spread = 10 + md*70;
+      var parts = [];
+      basePoints.forEach(function(p){
+        var x = p.cx + p.ox*spread;
+        var y = p.cy + p.oy*spread;
+        parts.push('<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="4.5" fill="var(--p-600)" opacity="0.8"/>');
+      });
+      svg.innerHTML = parts.join('');
+    }
+    slider.addEventListener('input', function(){
+      var v = +this.value;
+      readout.textContent = v.toFixed(2);
+      draw(v);
+    });
+    draw(0.1);
+  })();
+
+})();
+</script>
+</body>
+</html>
